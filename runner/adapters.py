@@ -12,6 +12,8 @@ def run(agent, prompt):
         except Exception as e: raise AdapterMissing(f"ollama: {e}")
     cli = {"claude-code":"claude","hermes":"hermes","codex":"codex","opencode":"opencode"}.get(agent)
     if agent == "openclaw":
+        if not os.getenv("OPENCLAW_URL"):
+            raise AdapterMissing("openclaw: OPENCLAW_URL fehlt, siehe .env")
         return "openclaw-stub: verbinde API-Key, siehe .env"
     if cli and shutil.which(cli) is None:
         raise AdapterMissing(f"CLI '{cli}' fehlt im Runner-Image")

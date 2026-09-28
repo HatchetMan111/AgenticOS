@@ -1,5 +1,7 @@
 import sys; sys.path.insert(0, "agent-os-proxmox")
-from store import store
+from store import store, init_db
+try: init_db("data/app.db")
+except Exception: pass
 from runner.adapters import run, AdapterMissing
 def submit(title, agent, prompt): return store.create_task(title, agent, prompt)
 def task_status(tid):

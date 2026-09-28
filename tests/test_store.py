@@ -2,7 +2,10 @@
 import os, tempfile
 from store import store
 
-def test_create_and_status_and_redaction():
+def test_create_and_status_and_redaction(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    os.makedirs("data", exist_ok=True)
+    store.init_db("data/app.db")
     d = tempfile.mkdtemp()
     db = os.path.join(d, "app.db")
     store.init_db(db)

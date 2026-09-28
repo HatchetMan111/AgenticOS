@@ -3,7 +3,9 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 import sys; sys.path.insert(0, "agent-os-proxmox")
-from store import create_task
+from store import create_task, init_db
+try: init_db("data/app.db")
+except Exception: pass
 AGENTS = {"claude-code","hermes","openclaw","codex","ollama","opencode","mock"}
 app = FastAPI(); sec = HTTPBasic()
 class T(BaseModel): title: str; agent: str; prompt: str
