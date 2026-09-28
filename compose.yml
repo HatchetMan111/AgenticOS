@@ -1,0 +1,22 @@
+services:
+  gateway:
+    build: ./gateway
+    ports: ["8000:8000"]
+    env_file: .env
+    volumes: ["./memory:/memory", "./data:/data"]
+    restart: unless-stopped
+  runner:
+    build: ./runner
+    env_file: .env
+    volumes: ["./memory:/memory", "./data:/data"]
+    restart: unless-stopped
+  scheduler:
+    build: ./scheduler
+    env_file: .env
+    volumes: ["./memory:/memory", "./data:/data"]
+    restart: unless-stopped
+  web:
+    image: nginx:alpine
+    ports: ["8080:80"]
+    volumes: ["./web:/usr/share/nginx/html:ro"]
+    restart: unless-stopped
