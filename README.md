@@ -15,3 +15,12 @@ Adapter mock: Stub, gibt immer `mock-ok: ...` zurueck.
 - [ ] Je Adapter 1 manueller Task (mock sofort, Rest nach CLI/API-Setup)
 - [ ] Memory-File unter memory/runs + DB-Eintrag nach Run vorhanden
 - [ ] Proxmox-Snapshot vor Updates dokumentiert
+## Installation (Proxmox-Host, Einzeiler)
+bash -c "$(wget -qLO - https://raw.githubusercontent.com/HatchetMan111/AgenticOS/main/install/agentic-os.sh)"
+## Update
+Einzeiler erneut ausführen (Hostname existiert -> Update-Pfad, kein neuer CT).
+## Deinstall
+pct stop <CTID> && pct destroy <CTID>
+## Testprotokoll (manuell, mit Log)
+1. Einzeiler auf frischem Host, Log sichern. 2. URL aus Ausgabe öffnen.
+3. `pct reboot <CTID>`, nach 60s URL erneut öffnen + `pct exec <CTID> -- systemctl is-active agentic-os-gateway agentic-os-scheduler nginx`.
