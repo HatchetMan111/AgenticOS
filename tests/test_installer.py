@@ -15,3 +15,19 @@ def test_gateway_binds_all():
 def test_nginx_proxies():
     t = _read("install/nginx/agentic-os.conf")
     assert "listen 8080" in t and "proxy_pass http://127.0.0.1:8000" in t
+def test_installer_head():
+    t = _read("install/agentic-os.sh")
+    assert t.startswith("#!/usr/bin/env bash\nset -euo pipefail")
+    for v in ['APP="agentic-os"', 'HOSTNAME="agentic-os"', "CPU=2", "RAM=2048", "DISK=8"]:
+        assert v in t
+def test_installer_nextid_and_retry():
+    t = _read("install/agentic-os.sh")
+    assert "pvesh get /cluster/nextid" in t
+    assert "RETRY" in t  # ID-Race: genau 1 Retry, dann Abbruch
+def test_installer_create_flags():
+    t = _read("install/agentic-os.sh")
+    assert "--unprivileged 1" in t and "--onboot 1" in t and "ip=dhcp" in t
+def test_installer_bash_syntax():
+    import subprocess
+    r = subprocess.run(["bash", "-n", "agent-os-proxmox/install/agentic-os.sh"], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
