@@ -31,3 +31,13 @@ def test_installer_bash_syntax():
     import subprocess
     r = subprocess.run(["bash", "-n", "agent-os-proxmox/install/agentic-os.sh"], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
+def test_setup_blocks():
+    t = _read("install/agentic-os.sh")
+    for b in ["setup_base", "setup_python", "setup_repo", "setup_units", "setup_nginx", "setup_firewall"]:
+        assert b in t
+    assert "python3 -m venv /opt/agentic-os/venv" in t
+    assert "systemctl enable --now" in t
+    assert "Restart=always" in t or "daemon-reload" in t
+def test_pip_failure_aborts():
+    t = _read("install/agentic-os.sh")
+    assert "pip install" in t and "set -e" in t  # via set -euo pipefail: pip-Fail bricht Block ab

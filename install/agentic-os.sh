@@ -104,3 +104,61 @@ wait_for_ip() {
   done
   fail "keine IP nach 24x5s (Container ${id} bleibt stehen)"
 }
+
+CT_EXEC() { pct exec "$CTID" -- bash -s; }  # liest Heredoc von stdin, Fehler via set -e
+
+setup_base() {
+  CT_EXEC <<'EOF'
+set -euo pipefail
+apt-get update && apt-get install -y python3-venv python3-pip nginx curl sqlite3 git
+mkdir -p /var/lib/agentic-os /etc/agentic-os
+EOF
+}
+setup_python() {
+  CT_EXEC <<'EOF'
+set -euo pipefail
+python3 -m venv /opt/agentic-os/venv
+/opt/agentic-os/venv/bin/pip install --upgrade pip
+EOF
+}
+setup_repo() {
+  CT_EXEC <<EOF
+set -euo pipefail
+if [ -d /opt/agentic-os/src/.git ]; then git -C /opt/agentic-os/src pull --ff-only; else git clone --branch $BRANCH $REPO /opt/agentic-os/src; fi
+/opt/agentic-os/venv/bin/pip install -r /opt/agentic-os/src/gateway/requirements.txt -r /opt/agentic-os/src/scheduler/requirements.txt
+EOF
+}
+setup_units() {
+  for u in gateway runner scheduler; do
+    pct push "$CTID" "install/systemd/agentic-os-$u.service" "/etc/systemd/system/agentic-os-$u.service"
+  done
+  CT_EXEC <<'EOF'
+set -euo pipefail
+[ -f /opt/agentic-os/src/runner/worker_daemon.py ] || echo "WARN: worker_daemon fehlt, runner-Unit bleibt inaktiv bis Folgerelease"
+systemctl daemon-reload
+systemctl enable --now agentic-os-gateway agentic-os-scheduler
+[ -f /opt/agentic-os/src/runner/worker_daemon.py ] && systemctl enable --now agentic-os-runner || true
+EOF
+}
+setup_nginx() {
+  pct push "$CTID" install/nginx/agentic-os.conf /etc/nginx/sites-enabled/agentic-os
+  CT_EXEC <<'EOF'
+set -euo pipefail
+rm -f /etc/nginx/sites-enabled/default
+ln -sfn /opt/agentic-os/src/web /opt/agentic-os/web
+nginx -t && systemctl enable --now nginx
+EOF
+}
+setup_firewall() {
+  local node; node=$(hostname)
+  pvesh set "/nodes/$node/lxc/$CTID/firewall/options" --enable 1 >>"$LOG" 2>&1 || true
+  pvesh create "/nodes/$node/lxc/$CTID/firewall/rules" --action ACCEPT --type in --dport 8080 --proto tcp --comment "agentic-os dashboard" >>"$LOG" 2>&1 || true
+}
+setup_container() {
+  step "Basis" setup_base
+  step "Python venv" setup_python
+  step "Repo + Deps" setup_repo
+  step "Units" setup_units
+  step "nginx" setup_nginx
+  step "Firewall" setup_firewall
+}
