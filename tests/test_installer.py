@@ -41,3 +41,10 @@ def test_setup_blocks():
 def test_pip_failure_aborts():
     t = _read("install/agentic-os.sh")
     assert "pip install" in t and "set -e" in t  # via set -euo pipefail: pip-Fail bricht Block ab
+def test_main_verify_update():
+    t = _read("install/agentic-os.sh")
+    assert "systemctl is-active" in t
+    assert "localhost:8080" in t and "localhost:8000" in t and "localhost:8001" in t
+    assert "update_container" in t  # Re-Run = Update, kein Doppel-CT
+    assert "--debug" in t or 'DEBUG="1"' in t or 'DEBUG:-0' in t
+    assert "pct destroy" in t  # Deinstall-Hinweis

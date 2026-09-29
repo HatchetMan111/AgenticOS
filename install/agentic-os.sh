@@ -162,3 +162,60 @@ setup_container() {
   step "nginx" setup_nginx
   step "Firewall" setup_firewall
 }
+
+update_container() {
+  CTID="$1"
+  CT_EXEC <<'EOF'
+set -euo pipefail
+git -C /opt/agentic-os/src pull --ff-only
+/opt/agentic-os/venv/bin/pip install -r /opt/agentic-os/src/gateway/requirements.txt -r /opt/agentic-os/src/scheduler/requirements.txt
+EOF
+  pct exec "$CTID" -- systemctl restart agentic-os-gateway || true
+  pct exec "$CTID" -- systemctl restart agentic-os-scheduler || true
+  pct exec "$CTID" -- systemctl restart nginx || true
+  verify
+}
+
+verify() {
+  pct exec "$CTID" -- systemctl is-active agentic-os-gateway || fail "gateway inaktiv"
+  pct exec "$CTID" -- systemctl is-active agentic-os-scheduler || fail "scheduler inaktiv"
+  pct exec "$CTID" -- systemctl is-active nginx || fail "nginx inaktiv"
+  pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8080/ && curl -fsS http://localhost:8080/health && curl -fsS http://localhost:8080/jobs' || fail "verify 8080 fail"
+  pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8000/ && curl -fsS http://localhost:8000/health && curl -fsS http://localhost:8000/jobs' || fail "verify 8000 fail"
+  pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8001/ && curl -fsS http://localhost:8001/health && curl -fsS http://localhost:8001/jobs' || fail "verify 8001 fail"
+  local ip
+  ip="$(pct exec "$CTID" -- hostname -I | awk '{print $1}')"
+  echo "FERTIG: http://${ip}:8080"
+}
+
+main() {
+  if [ "${1:-}" = "--debug" ]; then
+    DEBUG="1"
+    set -x
+  fi
+  local self tmp existing
+  self="$0"
+  tmp="$(mktemp)"
+  if [ -f "${self}" ]; then
+    cp "${self}" "${tmp}"
+  else
+    cat > "${tmp}"
+  fi
+  cd "$(dirname "${self}")/.." || fail "cd repo-root failed"
+  rm -f "${tmp}"
+  preflight
+  existing="$(existing_ct || true)"
+  if [ -n "${existing}" ]; then
+    update_container "${existing}"
+    return 0
+  fi
+  create_container
+  CTID="$(cat /tmp/agentic-os.ctid)"
+  pct start "$CTID"
+  wait_for_ip
+  setup_container
+  verify
+  # Deinstall-Hinweis: pct destroy <ctid> (CT bleibt bei FAIL stehen)
+}
+
+main "$@"
