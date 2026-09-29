@@ -48,3 +48,29 @@ def test_main_verify_update():
     assert "update_container" in t  # Re-Run = Update, kein Doppel-CT
     assert "--debug" in t or 'DEBUG="1"' in t or 'DEBUG:-0' in t
     assert "pct destroy" in t  # Deinstall-Hinweis
+def test_repo_url_full():
+    t = _read("install/agentic-os.sh")
+    assert 'REPO="https://github.com/HatchetMan111/AgenticOS.git"' in t
+def test_sources_from_host_checkout():
+    t = _read("install/agentic-os.sh")
+    assert "fetch_sources" in t
+    assert 'SRC_DIR="/tmp/agentic-os-install"' in t
+    assert 'git clone --depth 1 --branch "$BRANCH" "$REPO" "$SRC_DIR"' in t
+    assert "$SRC_DIR/install/systemd/agentic-os-$u.service" in t
+    assert "$SRC_DIR/install/nginx/agentic-os.conf" in t
+    assert "/dev/stdin" not in t
+    assert "mktemp" not in t
+def test_clone_target_no_src():
+    t = _read("install/agentic-os.sh")
+    assert "/opt/agentic-os/src" not in t
+    assert "git clone --branch $BRANCH $REPO /opt/agentic-os" in t
+    assert "git -C /opt/agentic-os pull --ff-only" in t
+    for p in ["gateway/requirements.txt", "scheduler/requirements.txt", "runner/requirements.txt"]:
+        assert f"/opt/agentic-os/{p}" in t
+    assert "ln -sfn /opt/agentic-os/src/web" not in t
+def test_verify_honest():
+    t = _read("install/agentic-os.sh")
+    assert "http://localhost:8080/api/health" in t
+    assert "test -f /opt/agentic-os/runner/worker_daemon.py" in t
+    assert "runner-Check skipped" in t
+    assert 'curl -sf "http://${ip}:8080/"' in t

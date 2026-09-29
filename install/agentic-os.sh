@@ -12,8 +12,9 @@ STORAGE="local-lvm"
 TEMPLATE_STORE="local"
 BRIDGE="vmbr0"
 DEBUG=0
-REPO="HatchetMan111/AgenticOS.git"
+REPO="https://github.com/HatchetMan111/AgenticOS.git"
 BRANCH="main"
+SRC_DIR="/tmp/agentic-os-install"
 LOG="/tmp/agentic-os-install.log"
 
 if [ "${DEBUG}" = "1" ]; then
@@ -49,6 +50,11 @@ preflight() {
     tpl="${TEMPLATE}_12.7-1_amd64.tar.zst"
   fi
   echo "${TEMPLATE_STORE}:vztmpl/${tpl}" > /tmp/agentic-os.tpl
+}
+
+fetch_sources() {
+  step "Checkout vorbereiten" rm -rf "$SRC_DIR" || fail "checkout cleanup failed"
+  step "Quellen klonen" git clone --depth 1 --branch "$BRANCH" "$REPO" "$SRC_DIR" || fail "git clone failed"
 }
 
 existing_ct() {
@@ -124,28 +130,28 @@ EOF
 setup_repo() {
   CT_EXEC <<EOF
 set -euo pipefail
-if [ -d /opt/agentic-os/src/.git ]; then git -C /opt/agentic-os/src pull --ff-only; else git clone --branch $BRANCH $REPO /opt/agentic-os/src; fi
-/opt/agentic-os/venv/bin/pip install -r /opt/agentic-os/src/gateway/requirements.txt -r /opt/agentic-os/src/scheduler/requirements.txt
+# /opt/agentic-os existiert bereits (venv aus setup_python): Platz fuer Clone schaffen, venv danach neu
+if [ -d /opt/agentic-os/.git ]; then git -C /opt/agentic-os pull --ff-only; else rm -rf /opt/agentic-os/venv; git clone --branch $BRANCH $REPO /opt/agentic-os; python3 -m venv /opt/agentic-os/venv; fi
+/opt/agentic-os/venv/bin/pip install -r /opt/agentic-os/gateway/requirements.txt -r /opt/agentic-os/scheduler/requirements.txt -r /opt/agentic-os/runner/requirements.txt
 EOF
 }
 setup_units() {
   for u in gateway runner scheduler; do
-    pct push "$CTID" "install/systemd/agentic-os-$u.service" "/etc/systemd/system/agentic-os-$u.service"
+    pct push "$CTID" "$SRC_DIR/install/systemd/agentic-os-$u.service" "/etc/systemd/system/agentic-os-$u.service"
   done
   CT_EXEC <<'EOF'
 set -euo pipefail
-[ -f /opt/agentic-os/src/runner/worker_daemon.py ] || echo "WARN: worker_daemon fehlt, runner-Unit bleibt inaktiv bis Folgerelease"
+[ -f /opt/agentic-os/runner/worker_daemon.py ] || echo "WARN: worker_daemon fehlt, runner-Unit bleibt inaktiv bis Folgerelease"
 systemctl daemon-reload
 systemctl enable --now agentic-os-gateway agentic-os-scheduler
-[ -f /opt/agentic-os/src/runner/worker_daemon.py ] && systemctl enable --now agentic-os-runner || true
+[ -f /opt/agentic-os/runner/worker_daemon.py ] && systemctl enable --now agentic-os-runner || true
 EOF
 }
 setup_nginx() {
-  pct push "$CTID" install/nginx/agentic-os.conf /etc/nginx/sites-enabled/agentic-os
+  pct push "$CTID" "$SRC_DIR/install/nginx/agentic-os.conf" /etc/nginx/sites-enabled/agentic-os
   CT_EXEC <<'EOF'
 set -euo pipefail
 rm -f /etc/nginx/sites-enabled/default
-ln -sfn /opt/agentic-os/src/web /opt/agentic-os/web
 nginx -t && systemctl enable --now nginx
 EOF
 }
@@ -167,11 +173,20 @@ update_container() {
   CTID="$1"
   CT_EXEC <<'EOF'
 set -euo pipefail
-git -C /opt/agentic-os/src pull --ff-only
-/opt/agentic-os/venv/bin/pip install -r /opt/agentic-os/src/gateway/requirements.txt -r /opt/agentic-os/src/scheduler/requirements.txt
+git -C /opt/agentic-os pull --ff-only
+/opt/agentic-os/venv/bin/pip install -r /opt/agentic-os/gateway/requirements.txt -r /opt/agentic-os/scheduler/requirements.txt -r /opt/agentic-os/runner/requirements.txt
 EOF
-  pct exec "$CTID" -- systemctl restart agentic-os-gateway || true
-  pct exec "$CTID" -- systemctl restart agentic-os-scheduler || true
+  for u in gateway runner scheduler; do
+    pct push "$CTID" "$SRC_DIR/install/systemd/agentic-os-$u.service" "/etc/systemd/system/agentic-os-$u.service"
+  done
+  pct push "$CTID" "$SRC_DIR/install/nginx/agentic-os.conf" /etc/nginx/sites-enabled/agentic-os
+  CT_EXEC <<'EOF'
+set -euo pipefail
+[ -f /opt/agentic-os/runner/worker_daemon.py ] || echo "WARN: worker_daemon fehlt, runner-Unit bleibt inaktiv bis Folgerelease"
+systemctl daemon-reload
+systemctl enable --now agentic-os-gateway agentic-os-scheduler
+[ -f /opt/agentic-os/runner/worker_daemon.py ] && systemctl enable --now agentic-os-runner || true
+EOF
   pct exec "$CTID" -- systemctl restart nginx || true
   verify
 }
@@ -180,11 +195,17 @@ verify() {
   pct exec "$CTID" -- systemctl is-active agentic-os-gateway || fail "gateway inaktiv"
   pct exec "$CTID" -- systemctl is-active agentic-os-scheduler || fail "scheduler inaktiv"
   pct exec "$CTID" -- systemctl is-active nginx || fail "nginx inaktiv"
-  pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8080/ && curl -fsS http://localhost:8080/health && curl -fsS http://localhost:8080/jobs' || fail "verify 8080 fail"
+  if pct exec "$CTID" -- test -f /opt/agentic-os/runner/worker_daemon.py; then
+    pct exec "$CTID" -- systemctl is-active agentic-os-runner || fail "runner inaktiv"
+  else
+    echo "WARN: worker_daemon fehlt im CT, runner-Check skipped"
+  fi
+  pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8080/api/health' || fail "verify 8080 fail"
   pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8000/ && curl -fsS http://localhost:8000/health && curl -fsS http://localhost:8000/jobs' || fail "verify 8000 fail"
   pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8001/ && curl -fsS http://localhost:8001/health && curl -fsS http://localhost:8001/jobs' || fail "verify 8001 fail"
   local ip
   ip="$(pct exec "$CTID" -- hostname -I | awk '{print $1}')"
+  curl -sf "http://${ip}:8080/" || fail "host-seitiger 8080-Check fail"
   echo "FERTIG: http://${ip}:8080"
 }
 
@@ -193,17 +214,9 @@ main() {
     DEBUG="1"
     set -x
   fi
-  local self tmp existing
-  self="$0"
-  tmp="$(mktemp)"
-  if [ -f "${self}" ]; then
-    cp "${self}" "${tmp}"
-  else
-    cat > "${tmp}"
-  fi
-  cd "$(dirname "${self}")/.." || fail "cd repo-root failed"
-  rm -f "${tmp}"
+  local existing
   preflight
+  fetch_sources
   existing="$(existing_ct || true)"
   if [ -n "${existing}" ]; then
     update_container "${existing}"
