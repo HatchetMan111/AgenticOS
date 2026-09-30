@@ -38,3 +38,18 @@ def test_read_api(tmp_path, monkeypatch):
     assert c.get("/tasks/999999", auth=a).status_code == 404
     assert c.get("/runs/999999/logs", auth=a).status_code == 404
     assert isinstance(c.get("/memory", auth=a).json(), list)
+
+def test_daemon_runs_and_survives_errors(tmp_path, monkeypatch):
+    import os
+    monkeypatch.chdir(tmp_path)
+    os.makedirs("data", exist_ok=True)
+    import sys; sys.path.insert(0, "agent-os-proxmox")
+    from runner import worker_daemon as wd
+    from store import store as st
+    st.init_db("data/app.db")
+    tid = st.create_task("T", "mock", "hello")
+    assert wd.run_once() == tid
+    assert st.task_detail(tid)["status"] == "review"
+    assert wd.run_once() is None  # nichts mehr da
+    n = wd.main_loop(interval=0, limit=2)  # zwei leere Runden
+    assert n == 0
