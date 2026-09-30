@@ -13,7 +13,7 @@ TEMPLATE_STORE="local"
 BRIDGE="vmbr0"
 DEBUG=0
 REPO="https://github.com/HatchetMan111/AgenticOS.git"
-BRANCH="main"
+BRANCH="master"
 SRC_DIR="/tmp/agentic-os-install"
 LOG="/tmp/agentic-os-install.log"
 

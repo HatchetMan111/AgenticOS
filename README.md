@@ -26,13 +26,13 @@ Einfach kopieren und auf dem Proxmox-Host als `root` einfügen
 (Community-Scripts-Stil, keine weitere Datei nötig):
 
 ```bash
-bash -c "$(wget -qLO - https://raw.githubusercontent.com/HatchetMan111/AgenticOS/main/install/agentic-os.sh)"
+bash -c "$(wget -qLO - https://raw.githubusercontent.com/HatchetMan111/AgenticOS/master/install/agentic-os.sh)"
 ```
 
 Nur `--debug` wird unterstützt (`= bash -x`, maximale Fehlermeldungskette):
 
 ```bash
-bash -c "$(wget -qLO - https://raw.githubusercontent.com/HatchetMan111/AgenticOS/main/install/agentic-os.sh)" --debug
+bash -c "$(wget -qLO - https://raw.githubusercontent.com/HatchetMan111/AgenticOS/master/install/agentic-os.sh)" --debug
 ```
 
 Das Skript (`set -euo pipefail`, idempotent):
@@ -68,7 +68,7 @@ pct config $CT | grep -i onboot              # muss: onboot: 1
 ## 3. Update (idempotent – einfach erneut laufen lassen)
 
 ```bash
-bash -c "$(wget -qLO - https://raw.githubusercontent.com/HatchetMan111/AgenticOS/main/install/agentic-os.sh)"
+bash -c "$(wget -qLO - https://raw.githubusercontent.com/HatchetMan111/AgenticOS/master/install/agentic-os.sh)"
 # Hostname existiert -> Update-Pfad: git pull + pip install + Units/nginx neu pushen + restart. Kein neuer CT.
 ```
 

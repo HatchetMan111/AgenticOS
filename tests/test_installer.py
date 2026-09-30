@@ -74,3 +74,10 @@ def test_verify_honest():
     assert "test -f /opt/agentic-os/runner/worker_daemon.py" in t
     assert "runner-Check skipped" in t
     assert 'curl -sf "http://${ip}:8080/"' in t
+def test_branch_is_master():
+    t = _read("install/agentic-os.sh")
+    assert 'BRANCH="master"' in t
+def test_readme_raw_url_uses_master():
+    t = _read("README.md")
+    assert "/main/install/" not in t
+    assert "https://raw.githubusercontent.com/HatchetMan111/AgenticOS/master/install/agentic-os.sh" in t
