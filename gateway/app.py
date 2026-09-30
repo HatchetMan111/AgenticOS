@@ -21,3 +21,20 @@ def make(t: T, _=Depends(auth)):
     if not t.prompt.strip(): raise HTTPException(422, "empty prompt")
     if t.agent not in AGENTS: raise HTTPException(400, f"unknown agent, valid: {sorted(AGENTS)}")
     return {"id": create_task(t.title, t.agent, t.prompt)}
+from store import list_tasks, task_detail, get_logs, list_run_files
+@app.get("/tasks")
+def tasks(limit: int = 100, _=Depends(auth)): return list_tasks(limit)
+@app.get("/tasks/{tid}")
+def one_task(tid: int, _=Depends(auth)):
+    d = task_detail(tid)
+    if not d: raise HTTPException(404, "no such task")
+    return d
+@app.get("/runs/{rid}/logs")
+def run_logs(rid: int, _=Depends(auth)):
+    import sqlite3
+    c = sqlite3.connect("data/app.db")
+    if not c.execute("SELECT id FROM runs WHERE id=?", (rid,)).fetchone():
+        raise HTTPException(404, "no such run")
+    return {"lines": get_logs(rid).splitlines()}
+@app.get("/memory")
+def memory(_=Depends(auth)): return list_run_files()

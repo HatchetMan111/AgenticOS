@@ -18,3 +18,23 @@ def test_run_files_lists(tmp_path):
     f = store.save_run_log_file(1, "hello", memdir=str(tmp_path))
     rows = store.list_run_files(memdir=str(tmp_path))
     assert len(rows) == 1 and rows[0]["preview"].startswith("hello")
+
+def test_read_api(tmp_path, monkeypatch):
+    import os
+    import pathlib
+    gw_path = str(pathlib.Path("agent-os-proxmox/gateway/app.py").resolve())
+    monkeypatch.chdir(tmp_path)
+    os.makedirs("data", exist_ok=True)
+    from store import store as _st
+    _st.init_db("data/app.db")
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("gw2", gw_path)
+    gw = importlib.util.module_from_spec(spec); spec.loader.exec_module(gw)
+    from fastapi.testclient import TestClient
+    c = TestClient(gw.app)
+    assert c.get("/tasks").status_code == 401  # ohne Auth
+    a = ("admin", "change-me")
+    assert isinstance(c.get("/tasks", auth=a).json(), list)
+    assert c.get("/tasks/999999", auth=a).status_code == 404
+    assert c.get("/runs/999999/logs", auth=a).status_code == 404
+    assert isinstance(c.get("/memory", auth=a).json(), list)
