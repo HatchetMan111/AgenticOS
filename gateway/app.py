@@ -32,8 +32,9 @@ def one_task(tid: int, _=Depends(auth)):
 @app.get("/runs/{rid}/logs")
 def run_logs(rid: int, _=Depends(auth)):
     import sqlite3
-    c = sqlite3.connect("data/app.db")
-    if not c.execute("SELECT id FROM runs WHERE id=?", (rid,)).fetchone():
+    with sqlite3.connect("data/app.db") as c:
+        exists = c.execute("SELECT id FROM runs WHERE id=?", (rid,)).fetchone()
+    if not exists:
         raise HTTPException(404, "no such run")
     return {"lines": get_logs(rid).splitlines()}
 @app.get("/memory")

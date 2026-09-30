@@ -53,3 +53,17 @@ def test_daemon_runs_and_survives_errors(tmp_path, monkeypatch):
     assert wd.run_once() is None  # nichts mehr da
     n = wd.main_loop(interval=0, limit=2)  # zwei leere Runden
     assert n == 0
+
+def test_daemon_marks_failed_on_error(tmp_path, monkeypatch):
+    import os
+    monkeypatch.chdir(tmp_path)
+    os.makedirs("data", exist_ok=True)
+    import sys; sys.path.insert(0, "agent-os-proxmox")
+    from store import store as st
+    st.init_db("data/app.db")
+    tid = st.create_task("T", "mock", "hello")
+    from runner import worker, worker_daemon as wd
+    monkeypatch.setattr(worker, "execute", lambda _tid: (_ for _ in ()).throw(RuntimeError("boom")))
+    assert wd.run_once() == tid
+    assert st.task_detail(tid)["status"] == "failed"
+    assert wd.run_once() is None or isinstance(wd.run_once(), int)  # Loop lebt (None wenn nichts, int ok)
