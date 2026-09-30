@@ -152,7 +152,7 @@ setup_nginx() {
   CT_EXEC <<'EOF'
 set -euo pipefail
 rm -f /etc/nginx/sites-enabled/default
-nginx -t && systemctl enable --now nginx
+nginx -t && systemctl enable nginx && systemctl restart nginx
 EOF
 }
 setup_firewall() {

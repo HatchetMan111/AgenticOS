@@ -81,3 +81,8 @@ def test_readme_raw_url_uses_master():
     t = _read("README.md")
     assert "/main/install/" not in t
     assert "https://raw.githubusercontent.com/HatchetMan111/AgenticOS/master/install/agentic-os.sh" in t
+def test_nginx_restart_after_conf():
+    t = _read("install/agentic-os.sh")
+    # enable --now reicht nicht: apt startet nginx vorher mit Default-Conf -> restart nötig
+    assert "enable --now nginx" not in t
+    assert "systemctl restart nginx" in t
