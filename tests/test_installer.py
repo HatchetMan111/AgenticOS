@@ -93,3 +93,6 @@ def test_verify_probes_existing_routes_only():
     assert "http://localhost:8001/jobs" in t
     assert "localhost:8000/ &&" not in t
     assert "localhost:8001/ &&" not in t
+def test_nginx_sched_proxy():
+    t = _read("install/nginx/agentic-os.conf")
+    assert "location /sched/" in t and "proxy_pass http://127.0.0.1:8001" in t
