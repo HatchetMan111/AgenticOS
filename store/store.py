@@ -29,3 +29,26 @@ def save_run_log_file(run_id, text, memdir="memory/runs"):
     p = os.path.join(memdir, f"{datetime.date.today()}-{run_id}.md")
     open(p,"w").write(redact(text))
     return p
+def list_tasks(limit=100, db="data/app.db"):
+    with _c(db) as c:
+        return [{"id": r[0], "title": r[1], "agent": r[2], "status": r[3]}
+                for r in c.execute("SELECT id,title,agent,status FROM tasks ORDER BY id DESC LIMIT ?", (limit,))]
+def task_detail(task_id, db="data/app.db"):
+    with _c(db) as c:
+        r = c.execute("SELECT id,title,agent,prompt,status FROM tasks WHERE id=?", (task_id,)).fetchone()
+        if not r: return None
+        runs = [x[0] for x in c.execute("SELECT id FROM runs WHERE task_id=? ORDER BY id", (task_id,))]
+        return {"id": r[0], "title": r[1], "agent": r[2], "prompt": r[3], "status": r[4], "run_ids": runs}
+def claim_next(db="data/app.db"):
+    with _c(db) as c:
+        r = c.execute("SELECT id FROM tasks WHERE status='inbox' ORDER BY id LIMIT 1").fetchone()
+        if not r: return None
+        c.execute("UPDATE tasks SET status='running' WHERE id=? AND status='inbox'", (r[0],))
+        return r[0] if c.total_changes else None
+def list_run_files(memdir="memory/runs"):
+    import glob
+    rows = []
+    for p in sorted(glob.glob(os.path.join(memdir, "*.md"))):
+        txt = open(p).read()
+        rows.append({"name": os.path.basename(p), "preview": redact(txt)[:200]})
+    return rows

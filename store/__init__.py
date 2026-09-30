@@ -13,6 +13,10 @@ from .store import (
     get_logs,
     save_run_log_file,
     redact,
+    list_tasks,
+    task_detail,
+    claim_next,
+    list_run_files,
 )
 
 __all__ = [
@@ -24,4 +28,8 @@ __all__ = [
     "get_logs",
     "save_run_log_file",
     "redact",
+    "list_tasks",
+    "task_detail",
+    "claim_next",
+    "list_run_files",
 ]
