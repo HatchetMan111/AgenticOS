@@ -201,8 +201,8 @@ verify() {
     echo "WARN: worker_daemon fehlt im CT, runner-Check skipped"
   fi
   pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8080/api/health' || fail "verify 8080 fail"
-  pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8000/ && curl -fsS http://localhost:8000/health && curl -fsS http://localhost:8000/jobs' || fail "verify 8000 fail"
-  pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8001/ && curl -fsS http://localhost:8001/health && curl -fsS http://localhost:8001/jobs' || fail "verify 8001 fail"
+  pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8000/health' || fail "verify 8000 fail"
+  pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8001/jobs' || fail "verify 8001 fail"
   local ip
   ip="$(pct exec "$CTID" -- hostname -I | awk '{print $1}')"
   curl -sf "http://${ip}:8080/" || fail "host-seitiger 8080-Check fail"

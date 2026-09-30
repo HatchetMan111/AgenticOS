@@ -86,3 +86,10 @@ def test_nginx_restart_after_conf():
     # enable --now reicht nicht: apt startet nginx vorher mit Default-Conf -> restart nötig
     assert "enable --now nginx" not in t
     assert "systemctl restart nginx" in t
+def test_verify_probes_existing_routes_only():
+    t = _read("install/agentic-os.sh")
+    # Gateway hat nur GET /health (+POST /tasks), Scheduler nur GET /jobs — kein / querbeet
+    assert "http://localhost:8000/health" in t
+    assert "http://localhost:8001/jobs" in t
+    assert "localhost:8000/ &&" not in t
+    assert "localhost:8001/ &&" not in t
